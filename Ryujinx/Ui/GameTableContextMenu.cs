@@ -38,6 +38,7 @@ namespace Ryujinx.Ui
 #pragma warning disable IDE0044
         [GUI] MenuItem _openSaveUserDir;
         [GUI] MenuItem _openSaveDeviceDir;
+        [GUI] MenuItem _manageTitleUpdates;
         [GUI] MenuItem _extractRomFs;
         [GUI] MenuItem _extractExeFs;
         [GUI] MenuItem _extractLogo;
@@ -57,9 +58,10 @@ namespace Ryujinx.Ui
             _openSaveUserDir.Sensitive   = !Util.IsEmpty(controlData.ByteSpan) && controlData.Value.UserAccountSaveDataSize > 0;
             _openSaveDeviceDir.Sensitive = !Util.IsEmpty(controlData.ByteSpan) && controlData.Value.DeviceSaveDataSize > 0;
 
-            _extractRomFs.Activated += ExtractRomFs_Clicked;
-            _extractExeFs.Activated += ExtractExeFs_Clicked;
-            _extractLogo.Activated  += ExtractLogo_Clicked;
+            _manageTitleUpdates.Activated += ManageTitleUpdates_Clicked;
+            _extractRomFs.Activated       += ExtractRomFs_Clicked;
+            _extractExeFs.Activated       += ExtractExeFs_Clicked;
+            _extractLogo.Activated        += ExtractLogo_Clicked;
 
             _gameTableStore    = gameTableStore;
             _rowIter           = rowIter;
@@ -466,6 +468,14 @@ namespace Ryujinx.Ui
             filter.SetSaveDataType(SaveDataType.Device);
 
             OpenSaveDir(titleName, titleIdNumber, filter);
+        }
+
+        private void ManageTitleUpdates_Clicked(object sender, EventArgs args)
+        {
+            string titleId = _gameTableStore.GetValue(_rowIter, 2).ToString().Split("\n")[1].ToLower();
+
+            TitleUpdateWindow titleUpdateWindow = new TitleUpdateWindow(titleId, _virtualFileSystem);
+            titleUpdateWindow.Show();
         }
 
         private void ExtractRomFs_Clicked(object sender, EventArgs args)

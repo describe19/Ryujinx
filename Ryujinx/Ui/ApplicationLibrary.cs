@@ -9,6 +9,7 @@ using LibHac.Ncm;
 using LibHac.Ns;
 using LibHac.Spl;
 using Ryujinx.Common.Logging;
+using Ryujinx.Common.Configuration;
 using Ryujinx.Configuration.System;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.Loaders.Npdm;
@@ -220,7 +221,7 @@ namespace Ryujinx.Ui
                                     Nacp controlData = new Nacp(controlNacpFile.AsStream());
 
                                     // Get the title name, title ID, developer name and version number from the NACP
-                                    version = controlData.DisplayVersion;
+                                    version = IsUpdateApplied(titleId, out string updateVersion) ? updateVersion : controlData.DisplayVersion;
 
                                     GetNameIdDeveloper(controlData, out titleName, out _, out developer);
 
@@ -406,11 +407,11 @@ namespace Ryujinx.Ui
 
                     if (result.IsSuccess())
                     {
-                        saveDataPath = Path.Combine(virtualFileSystem.GetNandPath(), $"user/save/{saveDataInfo.SaveDataId:x16}");
+                        saveDataPath = Path.Combine(virtualFileSystem.GetNandPath(), "user", "save", saveDataInfo.SaveDataId.ToString("x16"));
                     }
                 }
 
-                ApplicationData data = new ApplicationData()
+                ApplicationData data = new ApplicationData
                 {
                     Favorite      = appMetadata.Favorite,
                     Icon          = applicationIcon,
@@ -621,6 +622,48 @@ namespace Ryujinx.Ui
             else
             {
                 titleId = "0000000000000000";
+            }
+        }
+
+        private static bool IsUpdateApplied(string titleId, out string version)
+        {
+            try
+            {
+                using (Stream stream = File.OpenRead(Path.Combine(_virtualFileSystem.GetBasePath(), "games", titleId, "updates.json")))
+                {
+                    IJsonFormatterResolver resolver = CompositeResolver.Create(StandardResolver.AllowPrivateSnakeCase);
+
+                    string updatePath = JsonSerializer.Deserialize<TitleUpdateMetadata>(stream, resolver).Selected;
+
+                    using (FileStream file = new FileStream(updatePath, FileMode.Open, FileAccess.Read))
+                    {
+                        PartitionFileSystem nsp = new PartitionFileSystem(file.AsStorage());
+
+                        foreach (DirectoryEntryEx fileEntry in nsp.EnumerateEntries("/", "*.nca"))
+                        {
+                            nsp.OpenFile(out IFile ncaFile, fileEntry.FullPath.ToU8Span(), OpenMode.Read).ThrowIfFailure();
+
+                            Nca nca = new Nca(_virtualFileSystem.KeySet, ncaFile.AsStorage());
+
+                            if (nca.Header.ContentType == NcaContentType.Control)
+                            {
+                                nca.OpenFileSystem(NcaSectionType.Data, IntegrityCheckLevel.None).OpenFile(out IFile nacpFile, "/control.nacp".ToU8Span(), OpenMode.Read).ThrowIfFailure();
+                                Nacp controlData = new Nacp(nacpFile.AsStream());
+
+                                version = controlData.DisplayVersion;
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                version = "";
+                return false;
+            }
+            catch
+            {
+                version = "";
+                return false;
             }
         }
     }
