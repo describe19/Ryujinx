@@ -14,23 +14,24 @@ namespace Ryujinx.Graphics.OpenGL
 
         private TextureView _emulatedViewParent;
 
+        private TextureView _textureViewFix;
+
         private readonly TextureCreateInfo _info;
 
-        private int _firstLayer;
-        private int _firstLevel;
+        public int FirstLayer { get; private set; }
+        public int FirstLevel { get; private set; }
 
-        public int Width         => _info.Width;
-        public int Height        => _info.Height;
-        public int DepthOrLayers => _info.GetDepthOrLayers();
-        public int Levels        => _info.Levels;
+        public int Width         
+            => _info.Width;
 
-        public Target Target => _info.Target;
-        public Format Format => _info.Format;
+        public int Height        
+            => _info.Height;
 
-        public int BlockWidth  => _info.BlockWidth;
-        public int BlockHeight => _info.BlockHeight;
+        public Target Target
+            => _info.Target;
 
-        public bool IsCompressed => _info.IsCompressed;
+        public Format Format 
+            => _info.Format;
 
         public TextureView(
             Renderer          renderer,
@@ -43,8 +44,8 @@ namespace Ryujinx.Graphics.OpenGL
             _parent   = parent;
             _info     = info;
 
-            _firstLayer = firstLayer;
-            _firstLevel = firstLevel;
+            FirstLayer = firstLayer;
+            FirstLevel = firstLevel;
 
             Handle = GL.GenTexture();
 
@@ -73,9 +74,9 @@ namespace Ryujinx.Graphics.OpenGL
                 target,
                 _parent.Handle,
                 pixelInternalFormat,
-                _firstLevel,
+                FirstLevel,
                 _info.Levels,
-                _firstLayer,
+                FirstLayer,
                 _info.GetLayers());
 
             GL.ActiveTexture(TextureUnit.Texture0);
@@ -107,8 +108,8 @@ namespace Ryujinx.Graphics.OpenGL
         {
             if (_info.IsCompressed == info.IsCompressed)
             {
-                firstLayer += _firstLayer;
-                firstLevel += _firstLevel;
+                firstLayer += FirstLayer;
+                firstLevel += FirstLevel;
 
                 return _parent.CreateView(info, firstLayer, firstLevel);
             }
@@ -123,10 +124,34 @@ namespace Ryujinx.Graphics.OpenGL
 
                 emulatedView._emulatedViewParent = this;
 
-                emulatedView._firstLayer = firstLayer;
-                emulatedView._firstLevel = firstLevel;
+                emulatedView.FirstLayer = firstLayer;
+                emulatedView.FirstLevel = firstLevel;
 
                 return emulatedView;
+            }
+        }
+
+        public int GetTextureViewFixHandle() {
+            // Intel / AMD have a bug where the view format is always ignored,
+            // it uses the parent format instead.
+            // As workaround we create a new texture with the correct
+            // format, and then do a copy after the draw.
+            if ( _parent.Info.Format != Format ) {
+                if ( _textureViewFix == null ) {
+                    _textureViewFix = ( TextureView )_renderer.CreateTexture( _info );
+                }
+
+                TextureCopyUnscaled.Copy( _parent.Info, _textureViewFix._info, _parent.Handle, _textureViewFix.Handle, FirstLayer, 0, FirstLevel, 0 );
+
+                return _textureViewFix.Handle;
+            }
+
+            return Handle;
+        }
+
+        public void SignalModified() {
+            if ( _textureViewFix != null ) {
+                TextureCopyUnscaled.Copy( _textureViewFix._info, _parent.Info, _textureViewFix.Handle, _parent.Handle, 0, FirstLayer, 0, FirstLevel );
             }
         }
 
@@ -134,15 +159,19 @@ namespace Ryujinx.Graphics.OpenGL
         {
             TextureView destinationView = (TextureView)destination;
 
-            TextureCopyUnscaled.Copy(this, destinationView, firstLayer, firstLevel);
+            TextureCopyUnscaled.Copy( _info, destinationView._info, Handle, destinationView.Handle, 0, firstLayer, 0, firstLevel );
 
             if (destinationView._emulatedViewParent != null)
             {
                 TextureCopyUnscaled.Copy(
-                    this,
-                    destinationView._emulatedViewParent,
-                    destinationView._firstLayer,
-                    destinationView._firstLevel);
+                    _info,
+                    destinationView._emulatedViewParent._info,
+                    Handle,
+                    destinationView._emulatedViewParent.Handle,
+                    0,
+                    destinationView.FirstLayer,
+                    0,
+                    destinationView.FirstLevel );
             }
         }
 
@@ -405,6 +434,12 @@ namespace Ryujinx.Graphics.OpenGL
 
         public void Dispose()
         {
+            if ( _textureViewFix != null ) {
+                _textureViewFix.Dispose();
+
+                _textureViewFix = null;
+            }
+
             if (Handle != 0)
             {
                 GL.DeleteTexture(Handle);

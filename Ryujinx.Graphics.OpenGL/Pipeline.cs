@@ -56,6 +56,8 @@ namespace Ryujinx.Graphics.OpenGL
             GL.ClearBuffer(ClearBuffer.Color, index, colors);
 
             RestoreComponentMask(index);
+
+            _framebuffer.SignalModified();
         }
 
         public void ClearRenderTargetDepthStencil(float depthValue, bool depthMask, int stencilValue, int stencilMask)
@@ -98,6 +100,8 @@ namespace Ryujinx.Graphics.OpenGL
             {
                 GL.DepthMask(_depthMask);
             }
+
+            _framebuffer.SignalModified();
         }
 
         public void DispatchCompute(int groupsX, int groupsY, int groupsZ)
@@ -137,6 +141,8 @@ namespace Ryujinx.Graphics.OpenGL
             {
                 DrawImpl(vertexCount, instanceCount, firstVertex, firstInstance);
             }
+
+            _framebuffer.SignalModified();
         }
 
         private void DrawQuadsImpl(
@@ -281,6 +287,8 @@ namespace Ryujinx.Graphics.OpenGL
                     firstVertex,
                     firstInstance);
             }
+
+            _framebuffer.SignalModified();
         }
 
         private void DrawQuadsIndexedImpl(

@@ -10,9 +10,9 @@ namespace Ryujinx.Graphics.OpenGL
 
         private readonly Renderer _renderer;
 
-        private readonly TextureCreateInfo _info;
+        public TextureCreateInfo Info { get; }
 
-        public Target Target => _info.Target;
+        private readonly TextureCreateInfo _info;
 
         private int _viewsCount;
 
