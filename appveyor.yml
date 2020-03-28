@@ -1,7 +1,7 @@
 version: 1.0.{build}
 branches:
   only:
-  - scissor
+  - testing
 image: Visual Studio 2019
 environment:
   matrix:
