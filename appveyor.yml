@@ -8,8 +8,8 @@ environment:
     - config: Release
       config_name: '-'
 
-    - config: Profile Release
-      config_name: '-profiled-'
+    ##- config: Profile Release
+    ##  config_name: '-profiled-'
 build_script:
 - ps: >-
     dotnet --version
