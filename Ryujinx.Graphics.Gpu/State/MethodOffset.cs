@@ -8,6 +8,15 @@ namespace Ryujinx.Graphics.Gpu.State
     /// </remarks>
     enum MethodOffset
     {
+        BindChannel                     = 0x00,
+        FenceValue                      = 0x1c,
+        FenceAction                     = 0x1d,
+        WaitForIdle                     = 0x44,
+        MacroUploadAddress              = 0x45,
+        SendMacroCodeData               = 0x46,
+        MacroBindingIndex               = 0x47,
+        BindMacro                       = 0x48,
+        SetMmeShadowRamControl          = 0x49,
         I2mParams                       = 0x60,
         LaunchDma                       = 0x6c,
         LoadInlineData                  = 0x6d,
@@ -15,6 +24,7 @@ namespace Ryujinx.Graphics.Gpu.State
         CopySrcTexture                  = 0x8c,
         DispatchParamsAddress           = 0xad,
         Dispatch                        = 0xaf,
+        SyncpointAction                 = 0xb2,
         CopyBuffer                      = 0xc0,
         CopyBufferParams                = 0x100,
         CopyBufferSwizzle               = 0x1c2,
@@ -33,6 +43,7 @@ namespace Ryujinx.Graphics.Gpu.State
         ClearStencilValue               = 0x368,
         DepthBiasState                  = 0x370,
         TextureBarrier                  = 0x378,
+        ScissorState                    = 0x380,
         StencilBackMasks                = 0x3d5,
         InvalidateTextures              = 0x3dd,
         TextureBarrierTiled             = 0x3df,

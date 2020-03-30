@@ -65,6 +65,8 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
             state.RegisterCallback(MethodOffset.Dispatch, Dispatch);
 
+            state.RegisterCallback(MethodOffset.SyncpointAction, IncrementSyncpoint);
+
             state.RegisterCallback(MethodOffset.CopyBuffer,  CopyBuffer);
             state.RegisterCallback(MethodOffset.CopyTexture, CopyTexture);
 
@@ -95,6 +97,19 @@ namespace Ryujinx.Graphics.Gpu.Engine
         }
 
         /// <summary>
+        /// Register callback for Fifo method calls that triggers an action on the GPFIFO.
+        /// </summary>
+        /// <param name="state">GPU state where the triggers will be registered</param>
+        public void RegisterCallbacksForFifo(GpuState state)
+        {
+            state.RegisterCallback(MethodOffset.FenceAction,            FenceAction);
+            state.RegisterCallback(MethodOffset.WaitForIdle,            WaitForIdle);
+            state.RegisterCallback(MethodOffset.SendMacroCodeData,      SendMacroCodeData);
+            state.RegisterCallback(MethodOffset.BindMacro,              BindMacro);
+            state.RegisterCallback(MethodOffset.SetMmeShadowRamControl, SetMmeShadowRamControl);
+        }
+
+        /// <summary>
         /// Updates host state based on the current guest GPU state.
         /// </summary>
         /// <param name="state">Guest GPU state</param>
@@ -115,6 +130,11 @@ namespace Ryujinx.Graphics.Gpu.Engine
                                     MethodOffset.RtDepthStencilEnable))
             {
                 UpdateRenderTargetState(state, useControl: true);
+            }
+
+            if (state.QueryModified(MethodOffset.ScissorState))
+            {
+                UpdateScissorState(state);
             }
 
             if (state.QueryModified(MethodOffset.DepthTestEnable,
@@ -322,6 +342,27 @@ namespace Ryujinx.Graphics.Gpu.Engine
         }
 
         /// <summary>
+        /// Updates host scissor test state based on current GPU state.
+        /// </summary>
+        /// <param name="state">Current GPU state</param>
+        private void UpdateScissorState(GpuState state)
+        {
+            for (int index = 0; index < Constants.TotalViewports; index++)
+            {
+                ScissorState scissor = state.Get<ScissorState>(MethodOffset.ScissorState, index);
+
+                bool enable = scissor.Enable && (scissor.X1 != 0 || scissor.Y1 != 0 || scissor.X2 != 0xffff || scissor.Y2 != 0xffff);
+
+                _context.Renderer.Pipeline.SetScissorEnable(index, enable);
+
+                if (enable)
+                {
+                    _context.Renderer.Pipeline.SetScissor(index, scissor.X1, scissor.Y1, scissor.X2 - scissor.X1, scissor.Y2 - scissor.Y1);
+                }
+            }
+        }
+
+        /// <summary>
         /// Updates host depth test state based on current GPU state.
         /// </summary>
         /// <param name="state">Current GPU state</param>
@@ -506,6 +547,7 @@ namespace Ryujinx.Graphics.Gpu.Engine
                 vertexAttribs[index] = new VertexAttribDescriptor(
                     vertexAttrib.UnpackBufferIndex(),
                     vertexAttrib.UnpackOffset(),
+                    vertexAttrib.UnpackIsConstant(),
                     format);
             }
 
