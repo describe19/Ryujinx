@@ -20,7 +20,6 @@ namespace Ryujinx.Graphics.Gpu.Engine
 
             }
 
-
             // Scissor affects clears aswell.
             if (state.QueryModified(MethodOffset.ScissorState))
             {
