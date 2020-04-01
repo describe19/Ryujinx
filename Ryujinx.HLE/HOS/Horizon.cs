@@ -4,7 +4,6 @@ using LibHac.Common;
 using LibHac.Fs;
 using LibHac.FsSystem;
 using LibHac.FsSystem.NcaUtils;
-using LibHac.FsSystem.RomFs;
 using LibHac.Ncm;
 using LibHac.Ns;
 using LibHac.Spl;
@@ -35,7 +34,7 @@ using System.Reflection;
 using System.Threading;
 
 using TimeServiceManager = Ryujinx.HLE.HOS.Services.Time.TimeManager;
-using NxStaticObject = Ryujinx.HLE.Loaders.Executables.NxStaticObject;
+using NxStaticObject     = Ryujinx.HLE.Loaders.Executables.NxStaticObject;
 
 using static LibHac.Fs.ApplicationSaveDataManagement;
 
@@ -43,21 +42,21 @@ namespace Ryujinx.HLE.HOS
 {
     public class Horizon : IDisposable
     {
-        internal const int InitialKipId = 1;
+        internal const int InitialKipId     = 1;
         internal const int InitialProcessId = 0x51;
 
-        internal const int HidSize = 0x40000;
+        internal const int HidSize  = 0x40000;
         internal const int FontSize = 0x1100000;
         internal const int IirsSize = 0x8000;
         internal const int TimeSize = 0x1000;
 
         private const int MemoryBlockAllocatorSize = 0x2710;
 
-        private const ulong UserSlabHeapBase = DramMemoryMap.SlabHeapBase;
+        private const ulong UserSlabHeapBase     = DramMemoryMap.SlabHeapBase;
         private const ulong UserSlabHeapItemSize = KMemoryManager.PageSize;
-        private const ulong UserSlabHeapSize = 0x3de000;
+        private const ulong UserSlabHeapSize     = 0x3de000;
 
-        internal long PrivilegedProcessLowestId { get; set; } = 1;
+        internal long PrivilegedProcessLowestId  { get; set; } = 1;
         internal long PrivilegedProcessHighestId { get; set; } = 8;
 
         internal Switch Device { get; private set; }
@@ -101,7 +100,7 @@ namespace Ryujinx.HLE.HOS
 
         internal AppletStateMgr AppletState { get; private set; }
 
-        internal KSharedMemory HidSharedMem { get; private set; }
+        internal KSharedMemory HidSharedMem  { get; private set; }
         internal KSharedMemory FontSharedMem { get; private set; }
         internal KSharedMemory IirsSharedMem { get; private set; }
         internal SharedFontManager Font { get; private set; }
@@ -119,7 +118,7 @@ namespace Ryujinx.HLE.HOS
 
         public string TitleName { get; private set; }
 
-        public ulong TitleId { get; private set; }
+        public ulong  TitleId { get; private set; }
         public string TitleIdText => TitleId.ToString("x16");
 
         public IntegrityCheckLevel FsIntegrityCheckLevel { get; set; }
@@ -162,7 +161,7 @@ namespace Ryujinx.HLE.HOS
 
             ContextIdManager = new KContextIdManager();
 
-            _kipId = InitialKipId;
+            _kipId     = InitialKipId;
             _processId = InitialProcessId;
 
             Scheduler.StartAutoPreemptionThread();
@@ -179,24 +178,24 @@ namespace Ryujinx.HLE.HOS
             // region used that is used is Application, so we can use the other ones for anything.
             KMemoryRegionManager region = MemoryRegions[(int)MemoryRegion.NvServices];
 
-            ulong hidPa = region.Address;
+            ulong hidPa  = region.Address;
             ulong fontPa = region.Address + HidSize;
             ulong iirsPa = region.Address + HidSize + FontSize;
             ulong timePa = region.Address + HidSize + FontSize + IirsSize;
 
             HidBaseAddress = (long)(hidPa - DramMemoryMap.DramBase);
 
-            KPageList hidPageList = new KPageList();
+            KPageList hidPageList  = new KPageList();
             KPageList fontPageList = new KPageList();
             KPageList iirsPageList = new KPageList();
             KPageList timePageList = new KPageList();
 
-            hidPageList.AddRange(hidPa, HidSize / KMemoryManager.PageSize);
+            hidPageList .AddRange(hidPa,  HidSize  / KMemoryManager.PageSize);
             fontPageList.AddRange(fontPa, FontSize / KMemoryManager.PageSize);
             iirsPageList.AddRange(iirsPa, IirsSize / KMemoryManager.PageSize);
             timePageList.AddRange(timePa, TimeSize / KMemoryManager.PageSize);
 
-            HidSharedMem = new KSharedMemory(this, hidPageList, 0, 0, MemoryPermission.Read);
+            HidSharedMem  = new KSharedMemory(this, hidPageList,  0, 0, MemoryPermission.Read);
             FontSharedMem = new KSharedMemory(this, fontPageList, 0, 0, MemoryPermission.Read);
             IirsSharedMem = new KSharedMemory(this, iirsPageList, 0, 0, MemoryPermission.Read);
 
@@ -257,7 +256,7 @@ namespace Ryujinx.HLE.HOS
 
             LocalFileSystem codeFs = new LocalFileSystem(exeFsDir);
 
-            LoadExeFs(codeFs);
+            LoadExeFs(codeFs, out _);
         }
 
         public void LoadXci(string xciFile)
@@ -295,8 +294,8 @@ namespace Ryujinx.HLE.HOS
                 throw new InvalidDataException("Could not find XCI secure partition");
             }
 
-            Nca mainNca = null;
-            Nca patchNca = null;
+            Nca mainNca    = null;
+            Nca patchNca   = null;
             Nca controlNca = null;
 
             XciPartition securePartition = xci.OpenPartition(XciPartitionType.Secure);
@@ -372,7 +371,7 @@ namespace Ryujinx.HLE.HOS
                 if (result.IsSuccess() && bytesRead == ControlData.ByteSpan.Length)
                 {
                     TitleName = ControlData.Value
-                        .Titles[(int)State.DesiredTitleLanguage].Name.ToString();
+                        .Titles[(int) State.DesiredTitleLanguage].Name.ToString();
 
                     if (string.IsNullOrWhiteSpace(TitleName))
                     {
@@ -414,8 +413,8 @@ namespace Ryujinx.HLE.HOS
                 }
             }
 
-            Nca mainNca = null;
-            Nca patchNca = null;
+            Nca mainNca    = null;
+            Nca patchNca   = null;
             Nca controlNca = null;
 
             foreach (DirectoryEntryEx fileEntry in nsp.EnumerateEntries("/", "*.nca"))
@@ -451,7 +450,7 @@ namespace Ryujinx.HLE.HOS
             }
 
             // This is not a normal NSP, it's actually a ExeFS as a NSP
-            LoadExeFs(nsp);
+            LoadExeFs(nsp, out _);
         }
 
         public void LoadNca(Nca mainNca, Nca patchNca, Nca controlNca)
@@ -463,8 +462,8 @@ namespace Ryujinx.HLE.HOS
                 return;
             }
 
-            IStorage dataStorage = null;
-            IFileSystem codeFs = null;
+            IStorage    dataStorage = null;
+            IFileSystem codeFs      = null;
 
             if (patchNca == null)
             {
@@ -504,13 +503,12 @@ namespace Ryujinx.HLE.HOS
             }
             else
             {
-                ulong titleId = OpenNpdm(codeFs).Aci0.TitleId;
-
-                IStorage layeredStorage = ApplyLayeredFs(dataStorage, titleId);
-                Device.FileSystem.SetRomFs(layeredStorage.AsStream(FileAccess.Read));
+                Device.FileSystem.SetRomFs(dataStorage.AsStream(FileAccess.Read));
             }
 
-            LoadExeFs(codeFs);
+            LoadExeFs(codeFs, out Npdm metaData);
+            
+            TitleId = metaData.Aci0.TitleId;
 
             if (controlNca != null)
             {
@@ -527,64 +525,7 @@ namespace Ryujinx.HLE.HOS
             }
         }
 
-        private IStorage ApplyLayeredFs(IStorage romStorage, ulong programId)
-        {
-            string lfsPath = Path.Combine(Device.FileSystem.GetBasePath(), "mods", programId.ToString("x16"));
-
-            if (!Directory.Exists(lfsPath))
-                return romStorage;
-
-            if (!Directory.EnumerateFileSystemEntries(lfsPath).Any())
-                return romStorage;
-
-            Logger.PrintInfo(LogClass.Loader, "Creating layered FS.");
-
-            List<IFileSystem> romSources = new List<IFileSystem>();
-            LocalFileSystem modRootFs = new LocalFileSystem(lfsPath);
-
-            DirectoryEntry dirEntry = default;
-            modRootFs.OpenDirectory(out IDirectory directory, "/", OpenDirectoryMode.Directory).ThrowIfFailure();
-
-            while (true)
-            {
-                // Iterate all mod directories
-                Result rc = directory.Read(out long entriesRead, SpanHelpers.AsSpan(ref dirEntry));
-                if (rc.IsFailure()) continue;
-                if (entriesRead == 0) break;
-
-                string modName = LibHac.Common.StringUtils.Utf8ZToString(dirEntry.Name);
-                string modRomFsPath = $"/{modName}/romfs";
-
-                // Check if the mod has a romfs directory
-                rc = modRootFs.GetEntryType(out DirectoryEntryType type, modRomFsPath);
-                if (rc.IsFailure() || type != DirectoryEntryType.Directory) continue;
-
-                Logger.PrintInfo(LogClass.Loader, $"Loading romfs mod \"{modName}\".");
-
-                rc = SubdirectoryFileSystem.CreateNew(out SubdirectoryFileSystem modRomFs, modRootFs,
-                    modRomFsPath.ToU8Span());
-
-                if (rc.IsFailure())
-                {
-                    Logger.PrintInfo(LogClass.Loader, $"Error loading romfs mod \"{modName}\". {rc.ToStringWithName()}");
-                    continue;
-                }
-
-                romSources.Add(modRomFs);
-            }
-
-            romSources.Add(new RomFsFileSystem(romStorage));
-
-            LayeredFileSystem layeredFs = new LayeredFileSystem(romSources);
-
-            Logger.PrintInfo(LogClass.Loader, $"Building RomFs");
-            IStorage layeredRomStorage = new RomFsBuilder(layeredFs).Build();
-            Logger.PrintInfo(LogClass.Loader, $"Finished building RomFs");
-
-            return layeredRomStorage;
-        }
-
-        private void LoadExeFs(IFileSystem codeFs)
+        private void LoadExeFs(IFileSystem codeFs, out Npdm metaData)
         {
             Result result = codeFs.OpenFile(out IFile npdmFile, "/main.npdm".ToU8Span(), OpenMode.Read);
 
@@ -632,24 +573,6 @@ namespace Ryujinx.HLE.HOS
             ProgramLoader.LoadStaticObjects(this, metaData, staticObjects.ToArray());
         }
 
-        private Npdm OpenNpdm(IFileSystem codeFs)
-        {
-            Result result = codeFs.OpenFile(out IFile npdmFile, "/main.npdm", OpenMode.Read);
-            using (npdmFile)
-            {
-                if (ResultFs.PathNotFound.Includes(result))
-                {
-                    Logger.PrintWarning(LogClass.Loader, "NPDM file not found, using default values!");
-
-                    return GetDefaultNpdm();
-                }
-                else
-                {
-                    return new Npdm(npdmFile.AsStream());
-                }
-            }
-        }
-
         public void LoadProgram(string filePath)
         {
             Npdm metaData = GetDefaultNpdm();
@@ -680,13 +603,13 @@ namespace Ryujinx.HLE.HOS
                         if (asetVersion == 0)
                         {
                             ulong iconOffset = reader.ReadUInt64();
-                            ulong iconSize = reader.ReadUInt64();
+                            ulong iconSize   = reader.ReadUInt64();
 
                             ulong nacpOffset = reader.ReadUInt64();
-                            ulong nacpSize = reader.ReadUInt64();
+                            ulong nacpSize   = reader.ReadUInt64();
 
                             ulong romfsOffset = reader.ReadUInt64();
-                            ulong romfsSize = reader.ReadUInt64();
+                            ulong romfsSize   = reader.ReadUInt64();
 
                             if (romfsSize != 0)
                             {
@@ -741,7 +664,7 @@ namespace Ryujinx.HLE.HOS
             ContentManager.LoadEntries(Device);
 
             TitleName = metaData.TitleName;
-            TitleId = metaData.Aci0.TitleId;
+            TitleId   = metaData.Aci0.TitleId;
 
             ProgramLoader.LoadStaticObjects(this, metaData, new IExecutable[] { staticObject });
         }
