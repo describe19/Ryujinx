@@ -543,7 +543,7 @@ namespace Ryujinx.HLE.HOS
             LocalFileSystem modRootFs = new LocalFileSystem(lfsPath);
 
             DirectoryEntry dirEntry = default;
-            modRootFs.OpenDirectory(out IDirectory directory, "/", OpenDirectoryMode.Directory).ThrowIfFailure();
+            modRootFs.OpenDirectory(out IDirectory directory, "/".ToU8Span(), OpenDirectoryMode.Directory).ThrowIfFailure();
 
             while (true)
             {
@@ -556,7 +556,7 @@ namespace Ryujinx.HLE.HOS
                 string modRomFsPath = $"/{modName}/romfs";
 
                 // Check if the mod has a romfs directory
-                rc = modRootFs.GetEntryType(out DirectoryEntryType type, modRomFsPath);
+                rc = modRootFs.GetEntryType(out DirectoryEntryType type, modRomFsPath.ToU8Span());
                 if (rc.IsFailure() || type != DirectoryEntryType.Directory) continue;
 
                 Logger.PrintInfo(LogClass.Loader, $"Loading romfs mod \"{modName}\".");
@@ -623,7 +623,7 @@ namespace Ryujinx.HLE.HOS
 
         private Npdm OpenNpdm(IFileSystem codeFs)
         {
-            Result result = codeFs.OpenFile(out IFile npdmFile, "/main.npdm", OpenMode.Read);
+            Result result = codeFs.OpenFile(out IFile npdmFile, "/main.npdm".ToU8Span(), OpenMode.Read);
             using (npdmFile)
             {
                 if (ResultFs.PathNotFound.Includes(result))
