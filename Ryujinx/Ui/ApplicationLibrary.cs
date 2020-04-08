@@ -219,7 +219,7 @@ namespace Ryujinx.Ui
                                     controlFs.OpenFile(out IFile controlNacpFile, "/control.nacp".ToU8Span(), OpenMode.Read).ThrowIfFailure();
 
                                     // Get the title name, title ID, developer name and version number from the NACP
-                                    version = IsUpdateApplied(titleId, out string updateVersion) ? updateVersion : controlData.DisplayVersion;
+                                    version = IsUpdateApplied(titleId, out string updateVersion) ? updateVersion : controlHolder.Value.DisplayVersion.ToString();
 
                                     GetNameIdDeveloper(ref controlHolder.Value, out titleName, out _, out developer);
 
