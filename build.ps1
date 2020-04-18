@@ -1,1 +1,1 @@
-dotnet publish -c Release -r win-x64 /p:Version=1.0.0-nacho-testing
+dotnet publish -c Release -r win-x64 /p:Version=1.0.0-nacho-testing > buildlog.txt
