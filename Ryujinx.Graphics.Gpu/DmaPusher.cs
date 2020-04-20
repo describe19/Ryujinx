@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Ryujinx.Graphics.Gpu
@@ -10,61 +8,10 @@ namespace Ryujinx.Graphics.Gpu
     /// </summary>
     public class DmaPusher
     {
-        private ConcurrentQueue<CommandBuffer> _commandBufferQueue;
+        private ConcurrentQueue<ulong> _ibBuffer;
 
-        private enum CommandBufferType
-        {
-            Prefetch,
-            NoPrefetch,
-        }
-
-        private struct CommandBuffer
-        {
-            /// <summary>
-            /// The type of the command buffer.
-            /// </summary>
-            public CommandBufferType Type;
-
-            /// <summary>
-            /// Fetched data.
-            /// </summary>
-            public int[] Words;
-
-            /// <summary>
-            /// The GPFIFO entry address. (used in NoPrefetch mode)
-            /// </summary>
-            public ulong EntryAddress;
-
-            /// <summary>
-            /// The count of entries inside this GPFIFO entry.
-            /// </summary>
-            public uint EntryCount;
-
-            /// <summary>
-            /// Fetch the command buffer.
-            /// </summary>
-            public void Fetch(GpuContext context)
-            {
-                if (Words == null)
-                {
-                    Words = MemoryMarshal.Cast<byte, int>(context.MemoryAccessor.GetSpan(EntryAddress, EntryCount * 4)).ToArray();
-                }
-            }
-
-            /// <summary>
-            /// Read inside the command buffer.
-            /// </summary>
-            /// <param name="context">The GPU context</param>
-            /// <param name="index">The index inside the command buffer</param>
-            /// <returns>The value read</returns>
-            public int ReadAt(GpuContext context, int index)
-            {
-                return Words[index];
-            }
-        }
-
-        private CommandBuffer _currentCommandBuffer;
-        private int           _wordsPosition;
+        private ulong _dmaPut;
+        private ulong _dmaGet;
 
         /// <summary>
         /// Internal GPFIFO state.
@@ -85,6 +32,9 @@ namespace Ryujinx.Graphics.Gpu
         private bool _sliActive;
 
         private bool _ibEnable;
+        private bool _nonMain;
+
+        private ulong _dmaMGet;
 
         private GpuContext _context;
 
@@ -98,89 +48,22 @@ namespace Ryujinx.Graphics.Gpu
         {
             _context = context;
 
-            _ibEnable = true;
+            _ibBuffer = new ConcurrentQueue<ulong>();
 
-            _commandBufferQueue = new ConcurrentQueue<CommandBuffer>();
+            _ibEnable = true;
 
             _event = new AutoResetEvent(false);
         }
 
         /// <summary>
-        /// Signal the pusher that there are new entries to process.
+        /// Pushes a GPFIFO entry.
         /// </summary>
-        public void SignalNewEntries()
+        /// <param name="entry">GPFIFO entry</param>
+        public void Push(ulong entry)
         {
+            _ibBuffer.Enqueue(entry);
+
             _event.Set();
-        }
-
-        /// <summary>
-        /// Push a GPFIFO entry in the form of a prefetched command buffer.
-        /// This is used by nvservices to handle special cases.
-        /// </summary>
-        /// <param name="commandBuffer">The command buffer containing the prefetched commands</param>
-        public void PushHostCommandBuffer(int[] commandBuffer)
-        {
-            _commandBufferQueue.Enqueue(new CommandBuffer
-            {
-                Type         = CommandBufferType.Prefetch,
-                Words        = commandBuffer,
-                EntryAddress = ulong.MaxValue,
-                EntryCount   = (uint)commandBuffer.Length
-            });
-        }
-
-        /// <summary>
-        /// Create a CommandBuffer from a GPFIFO entry.
-        /// </summary>
-        /// <param name="entry">The GPFIFO entry</param>
-        /// <returns></returns>
-        private CommandBuffer CreateCommandBuffer(ulong entry)
-        {
-            ulong length       = (entry >> 42) & 0x1fffff;
-            ulong startAddress = entry & 0xfffffffffc;
-
-            bool noPrefetch = (entry & (1UL << 63)) != 0;
-
-            CommandBufferType type = CommandBufferType.Prefetch;
-
-            if (noPrefetch)
-            {
-                type = CommandBufferType.NoPrefetch;
-            }
-
-            return new CommandBuffer
-            {
-                Type         = type,
-                Words        = null,
-                EntryAddress = startAddress,
-                EntryCount   = (uint)length
-            };
-        }
-
-        /// <summary>
-        /// Pushes GPFIFO entries.
-        /// </summary>
-        /// <param name="entries">GPFIFO entries</param>
-        public void PushEntries(ReadOnlySpan<ulong> entries)
-        {
-            bool beforeBarrier = true;
-
-            foreach (ulong entry in entries)
-            {
-                CommandBuffer commandBuffer = CreateCommandBuffer(entry);
-
-                if (beforeBarrier && commandBuffer.Type == CommandBufferType.Prefetch)
-                {
-                    commandBuffer.Fetch(_context);
-                }
-
-                if (commandBuffer.Type == CommandBufferType.NoPrefetch)
-                {
-                    beforeBarrier = false;
-                }
-
-                _commandBufferQueue.Enqueue(commandBuffer);
-            }
         }
 
         /// <summary>
@@ -206,9 +89,16 @@ namespace Ryujinx.Graphics.Gpu
         /// <returns>True if the FIFO still has commands to be processed, false otherwise</returns>
         private bool Step()
         {
-            if (_wordsPosition != _currentCommandBuffer.EntryCount)
+            if (_dmaGet != _dmaPut)
             {
-                int word = _currentCommandBuffer.ReadAt(_context, _wordsPosition++);
+                int word = _context.MemoryAccessor.ReadInt32(_dmaGet);
+
+                _dmaGet += 4;
+
+                if (!_nonMain)
+                {
+                    _dmaMGet = _dmaGet;
+                }
 
                 if (_state.LengthPending != 0)
                 {
@@ -280,12 +170,14 @@ namespace Ryujinx.Graphics.Gpu
                     }
                 }
             }
-            else if (_ibEnable && _commandBufferQueue.TryDequeue(out CommandBuffer entry))
+            else if (_ibEnable && _ibBuffer.TryDequeue(out ulong entry))
             {
-                _currentCommandBuffer = entry;
-                _wordsPosition        = 0;
+                ulong length = (entry >> 42) & 0x1fffff;
 
-                _currentCommandBuffer.Fetch(_context);
+                _dmaGet = entry & 0xfffffffffc;
+                _dmaPut = _dmaGet + length * 4;
+
+                _nonMain = (entry & (1UL << 41)) != 0;
             }
             else
             {
