@@ -4,6 +4,7 @@ branches:
   - testing
 image: Visual Studio 2019
 environment:
+  appveyor_dotnet_runtime: netcoreapp3.1
   matrix:
     - config: Release
       config_name: '-'
@@ -17,7 +18,7 @@ build_script:
 
     dotnet publish -c $env:config -r win-x64 /p:Version=$env:APPVEYOR_BUILD_VERSION
 
-    7z a ryujinx$env:config_name$env:APPVEYOR_BUILD_VERSION-win_x64.zip $env:APPVEYOR_BUILD_FOLDER\Ryujinx\bin\$env:config\netcoreapp3.0\win-x64\publish\
+    7z a ryujinx$env:config_name$env:APPVEYOR_BUILD_VERSION-win_x64.zip $env:APPVEYOR_BUILD_FOLDER\Ryujinx\bin\$env:config\$env:appveyor_dotnet_runtime\win-x64\publish\
 
 artifacts:
 - path: ryujinx%config_name%%APPVEYOR_BUILD_VERSION%-win_x64.zip

@@ -66,6 +66,8 @@ namespace Ryujinx.HLE.HOS
 
         internal Switch Device { get; private set; }
 
+        internal SurfaceFlinger SurfaceFlinger { get; private set; }
+
         public SystemStateMgr State { get; private set; }
 
         internal bool KernelInitialized { get; private set; }
@@ -114,7 +116,9 @@ namespace Ryujinx.HLE.HOS
 
         public Keyset KeySet => Device.FileSystem.KeySet;
 
+#pragma warning disable CS0649
         private bool _hasStarted;
+#pragma warning restore CS0649
         private bool _isDisposed;
 
         public BlitStruct<ApplicationControlProperty> ControlData { get; set; }
@@ -266,6 +270,8 @@ namespace Ryujinx.HLE.HOS
             DatabaseImpl.Instance.InitializeDatabase(device);
 
             HostSyncpoint = new NvHostSyncpt(device);
+
+            SurfaceFlinger = new SurfaceFlinger(device);
         }
 
         public void LoadCart(string exeFsDir, string romFsFile = null)
@@ -848,6 +854,8 @@ namespace Ryujinx.HLE.HOS
             {
                 _isDisposed = true;
 
+                SurfaceFlinger.Dispose();
+
                 KProcess terminationProcess = new KProcess(this);
 
                 KThread terminationThread = new KThread(this);
@@ -870,12 +878,6 @@ namespace Ryujinx.HLE.HOS
                 });
 
                 terminationThread.Start();
-
-                // Signal the vsync event to avoid issues of KThread waiting on it.
-                if (Device.EnableDeviceVsync)
-                {
-                    Device.VsyncEvent.Set();
-                }
 
                 // Destroy nvservices channels as KThread could be waiting on some user events.
                 // This is safe as KThread that are likely to call ioctls are going to be terminated by the post handler hook on the SVC facade.
